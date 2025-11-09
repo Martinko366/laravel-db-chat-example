@@ -417,7 +417,26 @@
             const data = await response.json();
             messageText.value = '';
             
-            // Message will appear through polling
+            // Immediately add the message to UI and update lastMessageId
+            if (data.message) {
+                lastMessageId = data.message.id;
+                
+                const messagesArea = document.getElementById('messagesArea');
+                const isMine = data.message.sender_id === currentUser.id;
+                const messageHtml = `
+                    <div class="flex ${isMine ? 'justify-end' : 'justify-start'}">
+                        <div class="max-w-xs lg:max-w-md">
+                            ${!isMine ? `<div class="text-xs text-gray-500 mb-1">${data.message.sender?.name || 'Unknown'}</div>` : ''}
+                            <div class="${isMine ? 'bg-blue-500 text-white' : 'bg-white'} rounded-lg px-4 py-2 shadow">
+                                ${data.message.body}
+                            </div>
+                            <div class="text-xs text-gray-400 mt-1">${new Date(data.message.created_at).toLocaleTimeString()}</div>
+                        </div>
+                    </div>
+                `;
+                messagesArea.insertAdjacentHTML('beforeend', messageHtml);
+                messagesArea.scrollTop = messagesArea.scrollHeight;
+            }
         } catch (error) {
             console.error('Error sending message:', error);
         }
@@ -510,6 +529,8 @@
         modal.classList.add('hidden');
         modal.classList.remove('flex');
         document.getElementById('groupTitle').value = '';
+        // Uncheck all checkboxes
+        document.querySelectorAll('.group-user-checkbox:checked').forEach(cb => cb.checked = false);
     }
 
     async function createGroup() {
@@ -517,8 +538,15 @@
         const selectedUsers = Array.from(document.querySelectorAll('.group-user-checkbox:checked'))
             .map(cb => parseInt(cb.value));
 
-        if (!title || selectedUsers.length < 2) {
-            alert('Please enter a group name and select at least 2 members');
+        console.log('Creating group:', { title, selectedUsers, count: selectedUsers.length });
+
+        if (!title) {
+            alert('Please enter a group name');
+            return;
+        }
+
+        if (selectedUsers.length < 2) {
+            alert(`Please select at least 2 members. Currently selected: ${selectedUsers.length}`);
             return;
         }
 
@@ -538,15 +566,23 @@
                 })
             });
 
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
             const data = await response.json();
-            conversations.push(data.conversation);
-            hideGroupModal();
-            renderConversations();
-            switchTab('conversations');
-            openConversation(data.conversation.id);
+            console.log('Group created:', data);
+            
+            if (data.conversation) {
+                conversations.push(data.conversation);
+                hideGroupModal();
+                renderConversations();
+                switchTab('conversations');
+                openConversation(data.conversation.id);
+            }
         } catch (error) {
             console.error('Error creating group:', error);
-            alert('Failed to create group');
+            alert('Failed to create group. Please try again.');
         }
     }
 </script>
